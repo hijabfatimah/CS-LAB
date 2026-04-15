@@ -1,38 +1,50 @@
 import streamlit as st
-import cv2
 import mediapipe as mp
 import numpy as np
+from PIL import Image
 
-# Page Setting
-st.set_page_config(page_title="AI Vision", layout="centered")
+# --- Page Setup ---
+st.set_page_config(page_title="AI Hand Tracker", layout="centered")
+st.title("🖐️ AI Hand Landmark Detector")
+st.write("Yeh version bina OpenCV ke chalti hai, taake koi error na aaye.")
 
-st.title("🖐️ AI Hand Detector")
-st.write("Yeh application bina kisi API ke kaam karti hai.")
-
-# Mediapipe setup (Pre-trained Model)
+# --- Mediapipe Settings ---
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
-hands = mp_hands.Hands(min_detection_confidence=0.7)
 
-# Camera Input UI
-image_file = st.camera_input("Apne hath ki photo lein")
+# Model load karein (Free aur Pre-trained)
+hands = mp_hands.Hands(
+    static_image_mode=True, 
+    max_num_hands=2, 
+    min_detection_confidence=0.5
+)
 
-if image_file is not None:
-    # Image ko process karne ke liye convert karein
-    file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-    frame = cv2.imdecode(file_bytes, 1)
+# --- UI / Camera ---
+img_file = st.camera_input("Apne hath ki photo khainchein")
+
+if img_file is not None:
+    # Image ko PIL ke zariye open karein
+    img = Image.open(img_file)
+    # Numpy array mein badlein (Mediapipe ke liye)
+    img_array = np.array(img)
     
-    # BGR to RGB (Mediapipe ke liye)
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    result = hands.process(rgb_frame)
+    # AI Model Process
+    results = hands.process(img_array)
 
-    # Agar hath mil jaye to us par points draw karein
-    if result.multi_hand_landmarks:
-        for hand_landmarks in result.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-        st.success("Hath mil gaya!")
+    # Drawing (Hum direct image par draw karenge)
+    if results.multi_hand_landmarks:
+        # Landmarks draw karne ke liye humein image ko editable banana hoga
+        annotated_image = img_array.copy()
+        for hand_landmarks in results.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(
+                annotated_image, 
+                hand_landmarks, 
+                mp_hands.HAND_CONNECTIONS
+            )
+        st.success(f"Detected {len(results.multi_hand_landmarks)} hand(s)!")
+        st.image(annotated_image, caption="AI Result", use_column_width=True)
     else:
-        st.warning("Hath nazar nahi aa raha, dobara koshish karein.")
+        st.warning("Hath detect nahi hua. Dobara koshish karein.")
+        st.image(img, caption="Original Image", use_column_width=True)
 
-    # Screen par dikhayein
-    st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_column_width=True)
+st.info("Note: Agar ab bhi error aaye, to 'Manage App' mein ja kar 'Reboot' lazmi karein.")
