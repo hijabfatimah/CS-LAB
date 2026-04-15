@@ -8,9 +8,7 @@ st.set_page_config(page_title="AI Object Detector", layout="centered")
 st.title("🤖 AI Image Recognition")
 st.write("Gallery se image upload karein ya Camera use karein.")
 
-# --- MODEL URL UPDATE ---
-# Hum Google ka ViT model ya Microsoft ka ResNet model use kar sakte hain
-# Agar aik model 404 de, to niche wala link change kar ke check karein
+# --- Model URL ---
 API_URL = "https://api-inference.huggingface.co/models/microsoft/resnet-50"
 headers = {"Authorization": "Bearer hf_xxxx"} 
 
@@ -19,10 +17,8 @@ def query(image_bytes):
         response = requests.post(API_URL, headers=headers, data=image_bytes)
         if response.status_code == 200:
             return response.json()
-        elif response.status_code == 404:
-            return {"error": "Model URL nahi mila (404). Link update karne ki zaroorat hai."}
         elif response.status_code == 503:
-            return {"error": "Model abhi load ho raha hai (503).", "loading": True}
+            return {"error": "Model load ho raha hai (503).", "loading": True}
         else:
             return {"error": f"API Error: {response.status_code}"}
     except Exception as e:
@@ -47,17 +43,16 @@ with tab2:
 if img_file is not None:
     img = Image.open(img_file)
     
-    # RGBA to RGB conversion
+    # RGBA to RGB conversion (Important for JPEG)
     if img.mode in ("RGBA", "P"):
         img = img.convert("RGB")
     
-    st.image(img, caption="Aapki Photo", use_container_width=True)
+    st.image(img, caption="Selected Photo", use_container_width=True)
     
-    with st.spinner('AI soch raha hai...'):
+    with st.spinner('AI analysis kar raha hai...'):
         buf = io.BytesIO()
         img.save(buf, format="JPEG")
         byte_im = buf.getvalue()
-
         output = query(byte_im)
 
     st.subheader("AI Prediction Result:")
@@ -66,4 +61,18 @@ if img_file is not None:
         for item in output:
             label = item.get('label', 'Unknown')
             score = item.get('score', 0)
-            st.write(f"
+            # Yahan fix kiya gaya hai
+            st.write(f"**{label.capitalize()}**")
+            st.progress(float(score))
+            st.caption(f"Confidence: {round(score*100, 2)}%")
+            
+    elif isinstance(output, dict) and "error" in output:
+        if output.get("loading"):
+            st.warning("Model pehli bar load ho raha hai. 20 seconds baad dubara koshish karein.")
+        else:
+            st.error(output["error"])
+    else:
+        st.error("Response fetch nahi ho saka. Internet check karein.")
+
+st.markdown("---")
+st.caption("Note: Yeh application Microsoft ResNet model istemal karti hai.")
