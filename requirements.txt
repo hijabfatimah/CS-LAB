@@ -1,4 +1,3 @@
 streamlit
-mediapipe
+requests
 Pillow
-numpy
