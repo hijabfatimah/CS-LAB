@@ -1,61 +1,42 @@
 import streamlit as st
-import cv2
-import mediapipe as mp
 import numpy as np
 
-# --- Page Configuration ---
-st.set_page_config(page_title="AI Computer Vision App", layout="wide")
+# OpenCV aur Mediapipe ko safe tareeqay se import karein
+try:
+    import cv2
+    import mediapipe as mp
+except ImportError as e:
+    st.error(f"Module load nahi ho saka: {e}")
+    st.stop()
 
-st.title("🤖 AI Computer Vision: Hand Tracker")
-st.markdown("""
-Aap is application ke zariye real-time mein hand landmarks detect kar sakte hain. 
-Yeh model **Mediapipe** par mabni hai aur is mein koi API key ki zaroorat nahi.
-""")
+# --- UI Setup ---
+st.set_page_config(page_title="AI Hand Tracker", layout="centered")
+st.title("🖐️ AI Hand Landmark Detection")
+st.write("Sirf 2 files ke sath chalti hui computer vision application.")
 
-# --- Sidebar Settings ---
-st.sidebar.header("Settings")
-detection_confidence = st.sidebar.slider("Min Detection Confidence", 0.0, 1.0, 0.5)
-tracking_confidence = st.sidebar.slider("Min Tracking Confidence", 0.0, 1.0, 0.5)
-
-# --- Initialize Mediapipe ---
+# Initialize Mediapipe
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
+hands = mp_hands.Hands(static_image_mode=False, max_num_hands=2, min_detection_confidence=0.5)
 
-hands = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=2,
-    min_detection_confidence=detection_confidence,
-    min_tracking_confidence=tracking_confidence
-)
+# User Friendly Camera Input
+img_file = st.camera_input("Apne hath ki photo lein")
 
-# --- Camera Input ---
-img_file_buffer = st.camera_input("Apna hath camera ke samne layein")
-
-if img_file_buffer is not None:
-    # Convert the file to an opencv image.
-    file_bytes = np.asarray(bytearray(img_file_buffer.read()), dtype=np.uint8)
+if img_file is not None:
+    # Convert image
+    file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
     image = cv2.imdecode(file_bytes, 1)
-    
-    # Image ko RGB mein convert karna zaroori hai (Mediapipe RGB use karta hai)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Process
     results = hands.process(image_rgb)
-
-    # Agar hath detect ho jayein to landmarks draw karein
+    
+    # Draw landmarks
     if results.multi_hand_landmarks:
         for hand_landmarks in results.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(
-                image, 
-                hand_landmarks, 
-                mp_hands.HAND_CONNECTIONS,
-                mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=2, circle_radius=2),
-                mp_drawing.DrawingSpec(color=(255, 0, 0), thickness=2, circle_radius=2)
-            )
-        
-        st.success(f"Detected {len(results.multi_hand_landmarks)} hand(s)!")
+            mp_drawing.draw_landmarks(image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+        st.success("Hath detect ho gaya!")
     else:
-        st.warning("Koi hath detect nahi hua.")
-
-    # Final Image Display
-    st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), use_column_width=True)
-
-st.sidebar.info("Yeh app Streamlit aur Mediapipe ke sath banayi gayi hai.")
+        st.warning("Hath nazar nahi aa raha.")
+        
+    st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
