@@ -8,21 +8,25 @@ st.set_page_config(page_title="AI Object Detector", layout="centered")
 st.title("🤖 AI Image Recognition")
 st.write("Gallery se image upload karein ya Camera use karein.")
 
-# Hugging Face Free API URL
-API_URL = "https://api-inference.huggingface.co/models/google/vit-base-patch16-224"
-# Yahan 'hf_xxxx' ki jagah apna Hugging Face token dalna behtar hai agar bar bar error aaye
+# --- MODEL URL UPDATE ---
+# Hum Google ka ViT model ya Microsoft ka ResNet model use kar sakte hain
+# Agar aik model 404 de, to niche wala link change kar ke check karein
+API_URL = "https://api-inference.huggingface.co/models/microsoft/resnet-50"
 headers = {"Authorization": "Bearer hf_xxxx"} 
 
 def query(image_bytes):
-    response = requests.post(API_URL, headers=headers, data=image_bytes)
-    # Check karein ke response theek hai ya nahi
-    if response.status_code == 200:
-        try:
+    try:
+        response = requests.post(API_URL, headers=headers, data=image_bytes)
+        if response.status_code == 200:
             return response.json()
-        except Exception:
-            return {"error": "JSON parse nahi ho saka."}
-    else:
-        return {"error": f"API Server ne error diya: {response.status_code}", "detail": response.text}
+        elif response.status_code == 404:
+            return {"error": "Model URL nahi mila (404). Link update karne ki zaroorat hai."}
+        elif response.status_code == 503:
+            return {"error": "Model abhi load ho raha hai (503).", "loading": True}
+        else:
+            return {"error": f"API Error: {response.status_code}"}
+    except Exception as e:
+        return {"error": str(e)}
 
 # --- UI Tabs ---
 tab1, tab2 = st.tabs(["📤 Image Upload", "📸 Camera Input"])
@@ -49,7 +53,7 @@ if img_file is not None:
     
     st.image(img, caption="Aapki Photo", use_container_width=True)
     
-    with st.spinner('AI analysis kar raha hai...'):
+    with st.spinner('AI soch raha hai...'):
         buf = io.BytesIO()
         img.save(buf, format="JPEG")
         byte_im = buf.getvalue()
@@ -58,23 +62,8 @@ if img_file is not None:
 
     st.subheader("AI Prediction Result:")
     
-    # Error Handling Logic
     if isinstance(output, list) and len(output) > 0:
         for item in output:
             label = item.get('label', 'Unknown')
             score = item.get('score', 0)
-            st.write(f"**{label.capitalize()}**")
-            st.progress(score)
-            st.caption(f"Confidence: {round(score*100, 2)}%")
-            
-    elif isinstance(output, dict) and "error" in output:
-        # Agar model pehli baar load ho raha ho
-        if "estimated_time" in output:
-            st.warning(f"Model load ho raha hai. Taqreeban {round(output['estimated_time'], 1)} seconds mein tayyar ho jayega. Dobara try karein.")
-        else:
-            st.error(f"Masla aya: {output['error']}")
-    else:
-        st.error("API se sahi response nahi mila. Shayad internet ya API key ka masla hai.")
-
-st.markdown("---")
-st.caption("Note: Yeh application Hugging Face API ka istemal karti hai.")
+            st.write(f"
