@@ -1,50 +1,49 @@
 import streamlit as st
-import mediapipe as mp
-import numpy as np
+import requests
 from PIL import Image
+import io
 
 # --- Page Setup ---
-st.set_page_config(page_title="AI Hand Tracker", layout="centered")
-st.title("🖐️ AI Hand Landmark Detector")
-st.write("Yeh version bina OpenCV ke chalti hai, taake koi error na aaye.")
+st.set_page_config(page_title="AI Object Detector", layout="centered")
+st.title("🤖 AI Image Recognition")
+st.write("Yeh app bina OpenCV aur bina Mediapipe ke chalti hai.")
 
-# --- Mediapipe Settings ---
-mp_hands = mp.solutions.hands
-mp_drawing = mp.solutions.drawing_utils
+# Hugging Face Free API (No payment required)
+# Aap koi bhi free model use kar sakte hain
+API_URL = "https://api-inference.huggingface.co/models/google/vit-base-patch16-224"
+# Aap apna free token yahan dal sakte hain ya isay public model ke liye use karein
+headers = {"Authorization": "Bearer hf_xxxx"} # Optional: Agar limit hit ho to token dalen
 
-# Model load karein (Free aur Pre-trained)
-hands = mp_hands.Hands(
-    static_image_mode=True, 
-    max_num_hands=2, 
-    min_detection_confidence=0.5
-)
+def query(image_bytes):
+    response = requests.post(API_URL, headers=headers, data=image_bytes)
+    return response.json()
 
 # --- UI / Camera ---
-img_file = st.camera_input("Apne hath ki photo khainchein")
+img_file = st.camera_input("Koi bhi cheez camera ke samne layein")
 
 if img_file is not None:
-    # Image ko PIL ke zariye open karein
+    # Image display
     img = Image.open(img_file)
-    # Numpy array mein badlein (Mediapipe ke liye)
-    img_array = np.array(img)
+    st.image(img, caption="Aapki Photo", use_column_width=True)
     
-    # AI Model Process
-    results = hands.process(img_array)
+    with st.spinner('AI soch raha hai...'):
+        # Image ko bytes mein convert karein
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        byte_im = buf.getvalue()
 
-    # Drawing (Hum direct image par draw karenge)
-    if results.multi_hand_landmarks:
-        # Landmarks draw karne ke liye humein image ko editable banana hoga
-        annotated_image = img_array.copy()
-        for hand_landmarks in results.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(
-                annotated_image, 
-                hand_landmarks, 
-                mp_hands.HAND_CONNECTIONS
-            )
-        st.success(f"Detected {len(results.multi_hand_landmarks)} hand(s)!")
-        st.image(annotated_image, caption="AI Result", use_column_width=True)
+        # AI Model se result lein
+        output = query(byte_im)
+
+    # Results dikhayein
+    st.subheader("AI Result:")
+    if isinstance(output, list) and len(output) > 0:
+        for item in output:
+            label = item.get('label', 'Unknown')
+            score = item.get('score', 0)
+            st.info(f"Mery mutabiq yeh **{label}** hai. (Confidence: {round(score*100, 2)}%)")
     else:
-        st.warning("Hath detect nahi hua. Dobara koshish karein.")
-        st.image(img, caption="Original Image", use_column_width=True)
+        st.error("AI samajh nahi saka. Dobara koshish karein.")
 
-st.info("Note: Agar ab bhi error aaye, to 'Manage App' mein ja kar 'Reboot' lazmi karein.")
+st.markdown("---")
+st.caption("Note: Yeh application server-side error se bachne ke liye API use karti hai.")
