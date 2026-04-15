@@ -1,41 +1,38 @@
 import streamlit as st
+import cv2
+import mediapipe as mp
 import numpy as np
 
-# Error handling for missing modules
-try:
-    import cv2
-    import mediapipe as mp
-except ImportError:
-    st.error("Libraries install ho rahi hain ya missing hain. Please 'Reboot App' par click karein.")
-    st.info("Ensure requirements.txt has 'opencv-python-headless'")
-    st.stop()
+# Page Setting
+st.set_page_config(page_title="AI Vision", layout="centered")
 
-# --- App UI ---
-st.set_page_config(page_title="AI Vision App", layout="centered")
-st.title("🤖 Free AI Computer Vision")
-st.caption("No API | No Payment | Open Source")
+st.title("🖐️ AI Hand Detector")
+st.write("Yeh application bina kisi API ke kaam karti hai.")
 
-# Mediapipe Logic
+# Mediapipe setup (Pre-trained Model)
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
-hands = mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.5)
+hands = mp_hands.Hands(min_detection_confidence=0.7)
 
-# Camera Input
-img_file = st.camera_input("Take a photo of your hand")
+# Camera Input UI
+image_file = st.camera_input("Apne hath ki photo lein")
 
-if img_file:
-    # Processing
-    file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
-    image = cv2.imdecode(file_bytes, 1)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = hands.process(image_rgb)
+if image_file is not None:
+    # Image ko process karne ke liye convert karein
+    file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+    frame = cv2.imdecode(file_bytes, 1)
     
-    # Drawing
-    if results.multi_hand_landmarks:
-        for hand_landmarks in results.multi_hand_landmarks:
-            mp_drawing.draw_landmarks(image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-        st.success("Hand Detected!")
+    # BGR to RGB (Mediapipe ke liye)
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    result = hands.process(rgb_frame)
+
+    # Agar hath mil jaye to us par points draw karein
+    if result.multi_hand_landmarks:
+        for hand_landmarks in result.multi_hand_landmarks:
+            mp_drawing.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+        st.success("Hath mil gaya!")
     else:
-        st.warning("No hand detected. Try again.")
-        
-    st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), use_column_width=True)
+        st.warning("Hath nazar nahi aa raha, dobara koshish karein.")
+
+    # Screen par dikhayein
+    st.image(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), use_column_width=True)
